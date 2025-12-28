@@ -3,43 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My High-Res Stream</title>
-    <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
-    <link href="https://unpkg.com/@videojs/themes@1/dist/fantasy/index.css" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css">
+    <title>Drive Stream Test</title>
 </head>
 <body>
 
-    <header>
-        <div class="logo">MY<span>STREAM</span> <small>(Original Quality)</small></div>
-    </header>
+    <h2>My Streaming Site</h2>
 
-    <div class="container">
-        <h2>Library</h2>
-        <div id="video-grid" class="grid"></div>
-    </div>
+    <video controls width="100%" height="auto" style="max-width: 800px; border: 1px solid #ccc;">
+        <source 
+            src="https://www.googleapis.com/drive/v3/files/1Jy4GaXQgStFadoU2XQLwDk4AOxJpQqaY?alt=media&key=AIzaSyBjkpshz3qevxyDDvqSyM0sF83F-DU2quI" 
+            type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
 
-    <div id="video-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn" onclick="closePlayer()">&times;</span>
-            
-            <video
-                id="my-player"
-                class="video-js vjs-theme-fantasy vjs-big-play-centered"
-                controls
-                preload="auto"
-                width="640"
-                height="264"
-                data-setup="{}"
-            >
-                <p class="vjs-no-js">
-                    To view this video please enable JavaScript.
-                </p>
-            </video>
-        </div>
-    </div>
+    <p><em>Note: If the video doesn't play, check the Console (F12) for CORS errors.</em></p>
 
-    <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
-    <script src="script.js"></script>
 </body>
 </html>
