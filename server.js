@@ -49,7 +49,10 @@ app.get('/video/:fileId', async (req, res) => {
     const fileId = req.params.fileId;
     const range = req.headers.range;
 
-    if (!range) return res.status(400).send("Requires Range header");
+  // ADD THIS INSTEAD:
+if (!range) {
+    range = 'bytes=0-'; // Default to start of video if no range is asked
+}
 
     try {
         // STEP 1: Get the REAL long googleusercontent link
@@ -93,3 +96,4 @@ app.get('/video/:fileId', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Redirect-Proxy running on port ${PORT}`));
+
