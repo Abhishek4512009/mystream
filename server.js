@@ -1,60 +1,82 @@
 const express = require('express');
-const https = require('https');
+const axios = require('axios');
 const cors = require('cors');
 const app = express();
 
 app.use(cors());
 
-const API_KEY = process.env.GOOGLE_API_KEY;
-
-app.get('/video/:fileId', (req, res) => {
+app.get('/video/:fileId', async (req, res) => {
     const fileId = req.params.fileId;
     const range = req.headers.range;
 
-    if (!API_KEY) return res.status(500).send("Error: Missing API Key");
-    if (!range) return res.status(400).send("Requires Range header");
+    if (!range) {
+        return res.status(400).send("Requires Range header");
+    }
 
-    // 1. GENERATE A RANDOM USER ID (Bypasses "User Rate Limit")
-    const randomUser = Math.random().toString(36).substring(7);
-
-    // 2. CONSTRUCT URL WITH "acknowledgeAbuse=true" (Bypasses 100MB Limit)
-    const driveUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${API_KEY}&acknowledgeAbuse=true&quotaUser=${randomUser}`;
-
-    const options = {
-        headers: {
-            'Range': range,
-            'Accept': '*/*'
-        }
-    };
-
-    // 3. NATIVE REQUEST (Fixes "Stops after 1 second" bug)
-    const externalReq = https.get(driveUrl, options, (streamRes) => {
-
-        // --- ERROR TRAP: Catch the specific 403 Reason ---
-        if (streamRes.statusCode === 403) {
-            console.error(`GOOGLE BLOCKED FILE ${fileId}. Status: 403`);
-            
-            // Read the error message to see WHY
-            let errorData = '';
-            streamRes.on('data', chunk => errorData += chunk);
-            streamRes.on('end', () => {
-                console.error("GOOGLE ERROR REASON:", errorData);
-            });
-            
-            return res.status(403).send("Google Blocked This Request. Check Render Logs.");
-        }
-
-        // Pipe headers and video data directly to user
-        res.writeHead(streamRes.statusCode, streamRes.headers);
-        streamRes.pipe(res);
+    try {
+        // Phase 1: Initial Request (Pretend to be a Browser)
+        // We don't use the API here. We use the public download link.
+        const driveUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
         
-    });
-    
-    externalReq.on('error', (err) => {
-        console.error("Network Error:", err.message);
+        const firstResponse = await axios({
+            method: 'get',
+            url: driveUrl,
+            headers: {
+                // Crucial: Spoof the User-Agent so Google thinks we are Chrome, not a bot
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            },
+            validateStatus: false, // Don't throw error on 403/302 yet
+        });
+
+        // Phase 2: Handle "Virus Scan" Warning (For large files)
+        // If Google sends us a warning page (HTML), we must find the "confirm" token.
+        let finalUrl = driveUrl;
+        
+        if (firstResponse.headers['set-cookie']) {
+            // Extract the download warning cookie
+            const cookies = firstResponse.headers['set-cookie'];
+            const downloadWarning = cookies.find(c => c.includes('download_warning'));
+            
+            if (downloadWarning) {
+                // Construct the "Confirm" URL
+                // The warning cookie usually contains the token we need
+                const token = downloadWarning.split(';')[0].split('=')[1];
+                finalUrl += `&confirm=${token}`;
+            }
+        }
+
+        // Phase 3: Stream the Video
+        const videoResponse = await axios({
+            method: 'get',
+            url: finalUrl,
+            responseType: 'stream',
+            headers: {
+                'Range': range,
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            }
+        });
+
+        // Forward headers
+        res.set('Content-Range', videoResponse.headers['content-range']);
+        res.set('Accept-Ranges', 'bytes');
+        res.set('Content-Length', videoResponse.headers['content-length']);
+        res.set('Content-Type', 'video/mp4');
+        
+        res.status(206);
+        videoResponse.data.pipe(res);
+
+    } catch (error) {
+        console.error("Stream Failed:", error.message);
+        if (error.response) {
+            console.error("Google Status:", error.response.status);
+            // If it's 403 here, it's definitely the "Quota Exceeded" lock
+            if (error.response.status === 403) {
+                 console.error("CRITICAL: This File ID is locked by Google. Use a new file.");
+            }
+        }
         res.sendStatus(500);
-    });
+    }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Proxy running on port ${PORT}`));
+app.listen(PORT, () => console.log(`No-API Proxy running on port ${PORT}`));
