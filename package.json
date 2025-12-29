@@ -1,6 +1,7 @@
 {
   "name": "drive-proxy",
   "version": "1.0.0",
+  "description": "Drive Streaming Proxy",
   "main": "server.js",
   "dependencies": {
     "axios": "^1.6.0",
