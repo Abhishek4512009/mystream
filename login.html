@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Movie Night</title>
+    <style>
+        body { 
+            background: #0f0f0f; 
+            color: white; 
+            font-family: sans-serif; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            margin: 0; 
+        }
+        .box { 
+            background: #1f1f1f; 
+            padding: 40px; 
+            border-radius: 12px; 
+            width: 320px; 
+            text-align: center; 
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6); 
+            border: 1px solid #333;
+        }
+        h2 { color: #e50914; margin-bottom: 25px; font-size: 2em; }
+        input { 
+            width: 90%; 
+            padding: 12px; 
+            margin: 10px 0; 
+            border: 1px solid #333; 
+            border-radius: 6px; 
+            background: #333; 
+            color: white; 
+            font-size: 1em;
+        }
+        input:focus { outline: 2px solid #e50914; border-color: transparent; }
+        button { 
+            width: 100%; 
+            padding: 12px; 
+            background: #e50914; 
+            color: white; 
+            border: none; 
+            border-radius: 6px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            margin-top: 15px; 
+            font-size: 1.1em;
+            transition: 0.2s;
+        }
+        button:hover { background: #ff0f1f; }
+        .toggle { margin-top: 20px; font-size: 0.9em; color: #888; cursor: pointer; }
+        .toggle:hover { color: white; text-decoration: underline; }
+        .error { color: #ff4d4d; margin-bottom: 15px; display: none; background: rgba(255, 77, 77, 0.1); padding: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+
+    <div class="box">
+        <h2 id="title">Sign In</h2>
+        <div id="errorMsg" class="error">Invalid Credentials</div>
+        
+        <form id="authForm">
+            <input type="text" id="username" placeholder="Username" required autocomplete="username">
+            <input type="password" id="password" placeholder="Password" required autocomplete="current-password">
+            <button type="submit" id="btnText">Sign In</button>
+        </form>
+
+        <p class="toggle" onclick="toggleMode()">New here? Create an account</p>
+    </div>
+
+    <script>
+        // 🔴 CRITICAL: PASTE YOUR SERVE/PLAYIT TUNNEL LINK HERE       DONE 
+        // Example: 'https://my-movie-server.serveo.net' (No slash at the end)
+        const SERVER_URL = "https://islands-insights-calm-screens.trycloudflare.com"; 
+
+        let isLogin = true;
+        const form = document.getElementById('authForm');
+        const title = document.getElementById('title');
+        const btn = document.getElementById('btnText');
+        const errorMsg = document.getElementById('errorMsg');
+        const toggleText = document.querySelector('.toggle');
+
+        function toggleMode() {
+            isLogin = !isLogin;
+            title.innerText = isLogin ? "Sign In" : "Register";
+            btn.innerText = isLogin ? "Sign In" : "Register";
+            toggleText.innerText = isLogin ? "New here? Create an account" : "Already have an account? Sign In";
+            errorMsg.style.display = 'none';
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const user = document.getElementById('username').value;
+            const pass = document.getElementById('password').value;
+            
+            // We now attach the SERVER_URL because GitHub is a stranger to your PC
+            const endpoint = isLogin ? `${SERVER_URL}/login` : `${SERVER_URL}/register`;
+
+            // Visual feedback
+            btn.innerText = "Loading...";
+            btn.disabled = true;
+
+            try {
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    
+                    // 🔴 THIS IS THE KEY FIX:
+                    credentials: 'include', 
+                    
+                    body: JSON.stringify({ username: user, password: pass })
+                });
+
+                const data = await res.json();
+                
+                if (res.ok) {
+                    // Success! Redirect to the movies (Relative link stays same)
+                    window.location.href = 'index.html'; 
+                } else {
+                    // Show error
+                    errorMsg.innerText = data.message;
+                    errorMsg.style.display = 'block';
+                    btn.innerText = isLogin ? "Sign In" : "Register";
+                    btn.disabled = false;
+                }
+            } catch (err) {
+                console.error(err);
+                errorMsg.innerText = "Cannot connect to server (Check SERVER_URL)";
+                errorMsg.style.display = 'block';
+                btn.innerText = isLogin ? "Sign In" : "Register";
+                btn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
+
+
+
+
+
