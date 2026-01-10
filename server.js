@@ -5,6 +5,7 @@ const path = require('path');
 const ytSearch = require('yt-search');
 const YTDlpWrap = require('yt-dlp-wrap').default;
 const fs = require('fs');
+const os = require('os');
 
 const app = express();
 app.use(cors());
@@ -27,10 +28,21 @@ const binaryName = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
 const binaryPath = path.join(__dirname, binaryName);
 const ytDlpWrap = new YTDlpWrap(binaryPath);
 
-// Define where Render stores secret files
-const COOKIES_PATH = '/etc/secrets/cookies.txt';
+// --- 3. COOKIES FIX (CRITICAL) ---
+// We copy the locked secret file to a writable temporary folder
+const LOCKED_COOKIES_PATH = '/etc/secrets/cookies.txt';
+const WRITABLE_COOKIES_PATH = path.join(os.tmpdir(), 'cookies.txt');
 
-// --- 3. GOOGLE AUTHENTICATION ---
+try {
+    if (fs.existsSync(LOCKED_COOKIES_PATH)) {
+        fs.copyFileSync(LOCKED_COOKIES_PATH, WRITABLE_COOKIES_PATH);
+        console.log(`✅ Cookies copied to writable path: ${WRITABLE_COOKIES_PATH}`);
+    }
+} catch (err) {
+    console.error("⚠️ Could not copy cookies:", err.message);
+}
+
+// --- 4. GOOGLE AUTHENTICATION ---
 const oauth2Client = new google.auth.OAuth2(
     CLIENT_ID,
     CLIENT_SECRET,
@@ -118,18 +130,18 @@ app.post('/api/download', async (req, res) => {
         // Construct yt-dlp arguments
         let ytArgs = [
             video.url,
-            '-f', 'bestaudio',
+            '-f', 'bestaudio/best', // Changed to be more flexible
             '-o', '-',
             '--no-check-certificates',
             '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         ];
 
-        // Check if cookies exist (Render) or just run without (Local)
-        if (fs.existsSync(COOKIES_PATH)) {
-            console.log("🍪 Using cookies from Secret File...");
-            ytArgs.push('--cookies', COOKIES_PATH);
+        // Use the writable cookies if they exist
+        if (fs.existsSync(WRITABLE_COOKIES_PATH)) {
+            console.log("🍪 Using writable cookies...");
+            ytArgs.push('--cookies', WRITABLE_COOKIES_PATH);
         } else {
-            console.log("⚠️ No cookies.txt found at " + COOKIES_PATH + ". YouTube might block this.");
+            console.log("⚠️ No cookies found. YouTube might block this.");
         }
 
         // Stream via yt-dlp
@@ -155,8 +167,7 @@ app.post('/api/download', async (req, res) => {
 
     } catch (error) {
         console.error('Download Failed:', error.message);
-        // Provide a clearer error to the frontend
-        res.status(500).send('Download blocked by YouTube. Cookies required.');
+        res.status(500).send('Download failed. Check server logs.');
     }
 });
 
