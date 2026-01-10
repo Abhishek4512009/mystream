@@ -11,25 +11,24 @@ app.use(cors());
 app.use(express.json());
 
 // --- 1. ENVIRONMENT VARIABLES ---
-// We use process.env to read secrets from Render
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
 const REFRESH_TOKEN = process.env.REFRESH_TOKEN;
 const SPECIFIC_FOLDER_ID = process.env.FOLDER_ID;
 
-// Safety Check: Crash if keys are missing (helps debugging)
+// Safety Check
 if (!CLIENT_ID || !CLIENT_SECRET || !REFRESH_TOKEN || !SPECIFIC_FOLDER_ID) {
     console.error("❌ ERROR: Missing Environment Variables!");
-    console.error("Make sure CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN, and FOLDER_ID are set in Render.");
     process.exit(1);
 }
 
 // --- 2. YT-DLP CONFIGURATION ---
-// On Render, we will download the binary via the Build Command.
-// On your PC, it looks for yt-dlp.exe.
 const binaryName = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
 const binaryPath = path.join(__dirname, binaryName);
 const ytDlpWrap = new YTDlpWrap(binaryPath);
+
+// Define where Render stores secret files
+const COOKIES_PATH = '/etc/secrets/cookies.txt';
 
 // --- 3. GOOGLE AUTHENTICATION ---
 const oauth2Client = new google.auth.OAuth2(
@@ -116,12 +115,25 @@ app.post('/api/download', async (req, res) => {
 
         console.log(`🚀 Found: ${video.title}`);
 
-        // Stream via yt-dlp binary
-        let ytStream = ytDlpWrap.execStream([
+        // Construct yt-dlp arguments
+        let ytArgs = [
             video.url,
             '-f', 'bestaudio',
-            '-o', '-'
-        ]);
+            '-o', '-',
+            '--no-check-certificates',
+            '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        ];
+
+        // Check if cookies exist (Render) or just run without (Local)
+        if (fs.existsSync(COOKIES_PATH)) {
+            console.log("🍪 Using cookies from Secret File...");
+            ytArgs.push('--cookies', COOKIES_PATH);
+        } else {
+            console.log("⚠️ No cookies.txt found at " + COOKIES_PATH + ". YouTube might block this.");
+        }
+
+        // Stream via yt-dlp
+        let ytStream = ytDlpWrap.execStream(ytArgs);
 
         const fileMetadata = {
             name: `${video.title}.mp3`,
@@ -143,7 +155,8 @@ app.post('/api/download', async (req, res) => {
 
     } catch (error) {
         console.error('Download Failed:', error.message);
-        res.status(500).send(error.message);
+        // Provide a clearer error to the frontend
+        res.status(500).send('Download blocked by YouTube. Cookies required.');
     }
 });
 
