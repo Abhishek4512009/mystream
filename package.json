@@ -1,7 +1,7 @@
 {
   "name": "drive-music-streamer",
   "version": "1.0.0",
-  "description": "Stream audio from Google Drive service account",
+  "description": "Stream audio from Google Drive using service account",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
