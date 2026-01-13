@@ -7,6 +7,7 @@ const YTDlpWrap = require('yt-dlp-wrap').default;
 const fs = require('fs');
 const os = require('os');
 const ffmpegPath = require('ffmpeg-static'); // <--- NEW DEPENDENCY
+const mongoose = require('mongoose');
 
 const app = express();
 app.use(cors());
@@ -50,9 +51,6 @@ const oauth2Client = new google.auth.OAuth2(
 oauth2Client.setCredentials({ refresh_token: REFRESH_TOKEN });
 const drive = google.drive({ version: 'v3', auth: oauth2Client });
 
-
-const mongoose = require('mongoose');
-
 // --- MONGODB CONNECTION ---
 const MONGO_URI = "mongodb+srv://user:tn602025@cluster0.rstkwca.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
 
@@ -63,7 +61,8 @@ mongoose.connect(MONGO_URI)
 const UserSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    folderId: { type: String, required: true }
+    folderId: { type: String, required: true },
+    trackOrder: { type: [String], default: [] } // Store file sorting
 });
 const User = mongoose.model('User', UserSchema);
 
@@ -128,7 +127,23 @@ app.get('/api/tracks', async (req, res) => {
             fields: 'files(id, name, mimeType, size)',
             pageSize: 100,
         });
-        res.json(response.data.files);
+        
+        let files = response.data.files;
+
+        // Sort if User context exists
+        if (targetFolderId !== SPECIFIC_FOLDER_ID) {
+            const user = await User.findOne({ folderId: targetFolderId });
+            if (user && user.trackOrder && user.trackOrder.length > 0) {
+                const orderMap = new Map(user.trackOrder.map((id, index) => [id, index]));
+                files.sort((a, b) => {
+                    const indexA = orderMap.has(a.id) ? orderMap.get(a.id) : 9999;
+                    const indexB = orderMap.has(b.id) ? orderMap.get(b.id) : 9999;
+                    return indexA - indexB;
+                });
+            }
+        }
+
+        res.json(files);
     } catch (error) {
         res.status(500).send('Error fetching tracks');
     }
@@ -163,6 +178,50 @@ app.get('/api/stream/:fileId', async (req, res) => {
     } catch (error) {
         console.error('Stream Error:', error.message);
         res.status(500).end();
+    }
+});
+
+// --- LIBRARY MANAGEMENT ROUTES ---
+
+// Copy track from Global to User
+app.post('/api/library/add', async (req, res) => {
+    const { fileId, folderId } = req.body;
+    try {
+        await drive.files.copy({
+            fileId: fileId,
+            resource: { parents: [folderId] }
+        });
+        res.json({ success: true });
+    } catch (error) {
+        console.error("Copy Error:", error);
+        res.status(500).json({ error: "Failed to add song" });
+    }
+});
+
+// Remove track from User Library
+app.post('/api/library/remove', async (req, res) => {
+    const { fileId } = req.body;
+    try {
+        await drive.files.delete({ fileId: fileId });
+        res.json({ success: true });
+    } catch (error) {
+        console.error("Delete Error:", error);
+        res.status(500).json({ error: "Failed to delete song" });
+    }
+});
+
+// Reorder tracks
+app.post('/api/library/reorder', async (req, res) => {
+    const { folderId, newOrder } = req.body;
+    try {
+        await User.findOneAndUpdate(
+            { folderId: folderId }, 
+            { trackOrder: newOrder }
+        );
+        res.json({ success: true });
+    } catch (error) {
+        console.error("Reorder Error:", error);
+        res.status(500).json({ error: "Failed to save order" });
     }
 });
 
