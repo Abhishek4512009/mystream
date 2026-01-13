@@ -72,17 +72,31 @@ const User = mongoose.model('User', UserSchema);
 // 1. REGISTER
 app.post('/api/register', async (req, res) => {
     try {
-        const { username, password, folderId } = req.body;
-        if (!username || !password || !folderId) return res.status(400).json({ error: "Missing fields" });
+        const { username, password } = req.body; // Removed folderId
+        if (!username || !password) return res.status(400).json({ error: "Missing fields" });
 
         const existing = await User.findOne({ username });
         if (existing) return res.status(400).json({ error: "Username taken" });
 
-        const newUser = new User({ username, password, folderId });
+        // 1. Create a Folder on Drive
+        const folderMetadata = {
+            name: `mystream_${username}`,
+            mimeType: 'application/vnd.google-apps.folder',
+            parents: [SPECIFIC_FOLDER_ID] // Create inside the main app folder
+        };
+        const driveRes = await drive.files.create({
+            resource: folderMetadata,
+            fields: 'id'
+        });
+        const newFolderId = driveRes.data.id;
+
+        // 2. Save User
+        const newUser = new User({ username, password, folderId: newFolderId });
         await newUser.save();
 
-        res.json({ success: true, folderId });
+        res.json({ success: true, folderId: newFolderId });
     } catch (err) {
+        console.error("Register Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -154,10 +168,13 @@ app.get('/api/stream/:fileId', async (req, res) => {
 
 // --- NEW DOWNLOADER LOGIC (Download -> Convert -> Upload) ---
 app.post('/api/download', async (req, res) => {
-    const { songName } = req.body;
+    const { songName, folderId } = req.body;
     if (!songName) return res.status(400).send('No song name provided');
 
-    console.log(`🔎 Searching: ${songName}`);
+    // Choose target folder: Provided one (user's) OR default global
+    const targetFolder = folderId || SPECIFIC_FOLDER_ID;
+
+    console.log(`🔎 Searching: ${songName} for folder: ${targetFolder}`);
 
     try {
         const searchResults = await ytSearch(songName);
@@ -192,7 +209,7 @@ app.post('/api/download', async (req, res) => {
         // 2. Upload the MP3 file
         const fileMetadata = {
             name: `${video.title}.mp3`,
-            parents: [SPECIFIC_FOLDER_ID]
+            parents: [targetFolder] // Upload to the User's folder
         };
         const media = {
             mimeType: 'audio/mpeg',
