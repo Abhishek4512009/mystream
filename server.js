@@ -51,10 +51,64 @@ oauth2Client.setCredentials({ refresh_token: REFRESH_TOKEN });
 const drive = google.drive({ version: 'v3', auth: oauth2Client });
 
 
+const mongoose = require('mongoose');
+
+// --- MONGODB CONNECTION ---
+const MONGO_URI = "mongodb+srv://user:tn602025@cluster0.rstkwca.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
+
+mongoose.connect(MONGO_URI)
+    .then(() => console.log("✅ MongoDB Connected"))
+    .catch(err => console.error("❌ MongoDB Error:", err));
+
+const UserSchema = new mongoose.Schema({
+    username: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    folderId: { type: String, required: true }
+});
+const User = mongoose.model('User', UserSchema);
+
 // --- ROUTES ---
+
+// 1. REGISTER
+app.post('/api/register', async (req, res) => {
+    try {
+        const { username, password, folderId } = req.body;
+        if (!username || !password || !folderId) return res.status(400).json({ error: "Missing fields" });
+
+        const existing = await User.findOne({ username });
+        if (existing) return res.status(400).json({ error: "Username taken" });
+
+        const newUser = new User({ username, password, folderId });
+        await newUser.save();
+
+        res.json({ success: true, folderId });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 2. LOGIN
+app.post('/api/login', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        const user = await User.findOne({ username });
+
+        if (!user || user.password !== password) {
+            return res.status(401).json({ error: "Invalid credentials" });
+        }
+
+        res.json({ success: true, folderId: user.folderId });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.get('/api/tracks', async (req, res) => {
     try {
-        const query = `mimeType contains 'audio/' and trashed = false and '${SPECIFIC_FOLDER_ID}' in parents`;
+        // Use provided folderId from query, or fallback to env var (default library)
+        const targetFolderId = req.query.folderId || SPECIFIC_FOLDER_ID;
+
+        const query = `mimeType contains 'audio/' and trashed = false and '${targetFolderId}' in parents`;
         const response = await drive.files.list({
             q: query,
             fields: 'files(id, name, mimeType, size)',
@@ -113,7 +167,7 @@ app.post('/api/download', async (req, res) => {
         console.log(`🚀 Found: ${video.title} - Starting Conversion...`);
 
         // Generate a clean filename for the temp folder
-        const cleanTitle = video.title.replace(/[^a-zA-Z0-9]/g, '_'); 
+        const cleanTitle = video.title.replace(/[^a-zA-Z0-9]/g, '_');
         const tempFilePath = path.join(os.tmpdir(), `${cleanTitle}.mp3`);
 
         // 1. Download & Convert to File
@@ -152,7 +206,7 @@ app.post('/api/download', async (req, res) => {
         });
 
         console.log(`🎉 Upload Complete: ${driveResponse.data.name}`);
-        
+
         // 3. Cleanup (Delete temp file)
         fs.unlinkSync(tempFilePath);
 
