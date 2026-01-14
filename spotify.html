@@ -3,9 +3,16 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Drive Streamer</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        // IMMEDATE AUTH CHECK
+        if (!localStorage.getItem('isLoggedIn')) {
+            window.location.replace('login.html');
+        }
+    </script>
     <style>
         :root {
             --bg-color: #121212;
@@ -16,10 +23,18 @@
             --glass-border: rgba(255, 255, 255, 0.1);
             --text-primary: #ffffff;
             --text-secondary: #b3b3b3;
+            --nav-height: 60px;
         }
 
         * {
             box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
         }
 
         body {
@@ -29,6 +44,8 @@
             background-color: var(--bg-color);
             color: var(--text-primary);
             height: 100vh;
+            height: 100dvh;
+            /* Tablet/Mobile Viewport Fix */
             overflow: hidden;
             display: grid;
             grid-template-areas:
@@ -106,6 +123,7 @@
         .nav-item:hover,
         .nav-item.active {
             color: var(--text-primary);
+            filter: brightness(1.2);
         }
 
         /* Main Content */
@@ -114,6 +132,7 @@
             overflow-y: auto;
             padding: 32px;
             background: linear-gradient(180deg, rgba(0, 0, 0, 0.5) 0%, rgba(18, 18, 18, 1) 100%);
+            padding-bottom: 20px;
         }
 
         .header {
@@ -130,7 +149,8 @@
             padding: 10px 20px;
             display: flex;
             align-items: center;
-            width: 300px;
+            width: 100%;
+            max-width: 400px;
             transition: 0.3s;
         }
 
@@ -148,31 +168,6 @@
             font-family: inherit;
         }
 
-        .download-btn {
-            background: var(--primary-color);
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 50px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: 0.2s;
-            text-transform: uppercase;
-            font-size: 12px;
-            letter-spacing: 1px;
-        }
-
-        .download-btn:hover {
-            transform: scale(1.05);
-            box-shadow: 0 0 20px rgba(29, 185, 84, 0.4);
-        }
-
-        .download-btn:disabled {
-            background: #555;
-            cursor: not-allowed;
-            transform: none;
-        }
-
         h2 {
             margin-top: 0;
             font-size: 2rem;
@@ -187,8 +182,8 @@
 
         .track-row {
             display: grid;
-            grid-template-columns: 50px 1fr 100px;
-            /* # Title Duration */
+            grid-template-columns: 50px 1fr 100px 50px;
+            /* Added Action Column */
             padding: 12px 16px;
             border-radius: 8px;
             color: var(--text-secondary);
@@ -207,6 +202,11 @@
             background: rgba(29, 185, 84, 0.1);
         }
 
+        .track-row.dragging {
+            opacity: 0.5;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
         .track-num {
             font-size: 0.9rem;
             text-align: center;
@@ -216,6 +216,38 @@
             font-weight: 500;
             font-size: 1rem;
             color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .track-actions {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .action-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 1.2rem;
+            padding: 5px;
+            transition: 0.2s;
+        }
+
+        .action-btn:hover {
+            color: #fff;
+            transform: scale(1.1);
+        }
+
+        .action-btn.add:hover {
+            color: var(--primary-color);
+        }
+
+        .action-btn.remove:hover {
+            color: #ff4d4d;
         }
 
         /* Player Bar */
@@ -242,18 +274,19 @@
             height: 56px;
             background: #333;
             border-radius: 4px;
-            overflow: hidden;
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 24px;
             color: #555;
+            flex-shrink: 0;
         }
 
         .track-info {
             display: flex;
             flex-direction: column;
             justify-content: center;
+            overflow: hidden;
         }
 
         .track-name-lcd {
@@ -261,6 +294,9 @@
             color: #fff;
             font-size: 0.9rem;
             margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .artist-name-lcd {
@@ -273,14 +309,121 @@
             flex-direction: column;
             align-items: center;
             width: 40%;
+            gap: 5px;
+        }
+
+        .control-buttons {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .ctrl-btn {
+            background: transparent;
+            border: none;
+            color: #b3b3b3;
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: 0.2s;
+        }
+
+        .ctrl-btn:hover {
+            color: white;
+        }
+
+        .ctrl-btn.active {
+            color: var(--primary-color);
         }
 
         audio {
             width: 100%;
             height: 30px;
-            margin-top: 5px;
             filter: invert(1) hue-rotate(180deg);
-            /* Quick dark mode hack for default audio player */
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: #282828;
+            padding: 32px;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 500px;
+            position: relative;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal h3 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+        }
+
+        .modal-input {
+            width: 100%;
+            padding: 14px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            background: #181818;
+            color: white;
+            font-size: 1rem;
+            margin-bottom: 20px;
+            outline: none;
+        }
+
+        .modal-input:focus {
+            border-color: var(--primary-color);
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+            font-size: 0.9rem;
+            transition: 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: scale(1.05);
+            background: #1ed760;
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: #b3b3b3;
+            border: 1px solid #555;
+        }
+
+        .btn-secondary:hover {
+            color: white;
+            border-color: white;
         }
 
         #status {
@@ -292,6 +435,181 @@
             border-radius: 8px;
             border: 1px solid #333;
             display: none;
+            z-index: 500;
+        }
+
+        .quality-label {
+            width: 30%;
+            text-align: right;
+            font-size: 0.8rem;
+            color: #888;
+        }
+
+        /* Bottom Nav (Hidden on Desktop) */
+        .bottom-nav {
+            display: none;
+        }
+
+        /* --- TOUCH DEVICES (Mobile & Tablet) --- */
+        /* Changed from 1024px to 768px for Tablet Optimization */
+        @media (max-width: 768px) {
+            body {
+                display: flex;
+                flex-direction: column;
+                width: 100%;
+                margin: 0;
+                height: 100vh;
+                height: 100dvh;
+                overflow: hidden;
+                position: relative;
+            }
+
+            .sidebar {
+                display: none;
+            }
+
+            .main-content {
+                flex: 1;
+                width: 100%;
+                overflow-y: auto;
+                padding: 16px;
+                /* Reduced padding */
+                padding-bottom: 20px;
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 15px;
+                align-items: stretch;
+                margin-bottom: 20px;
+            }
+
+            .search-bar {
+                width: 100%;
+                max-width: 100%;
+            }
+
+            /* Grid Fix: 30px number | Title | 40px Action */
+            .track-row {
+                grid-template-columns: 30px 1fr 40px;
+                gap: 8px;
+                padding: 10px;
+            }
+
+            .track-row div:nth-child(3) {
+                display: none;
+            }
+
+            /* Hide Size Column specifically */
+
+            /* Stacked Player Bar */
+            .player-bar {
+                grid-area: auto;
+                position: relative;
+                width: 100%;
+                height: auto;
+                min-height: 90px;
+                /* Slightly taller for controls */
+                background: #181818;
+                border-top: 1px solid #282828;
+                margin: 0;
+                padding: 10px 16px;
+                flex-shrink: 0;
+                flex-direction: column;
+                /* Stack controls below info */
+                gap: 10px;
+                align-items: stretch;
+            }
+
+            .now-playing {
+                width: 100%;
+                gap: 12px;
+                margin-bottom: 0;
+            }
+
+            .cover-art {
+                width: 42px;
+                height: 42px;
+                font-size: 18px;
+            }
+
+            /* Player Controls on Mobile */
+            .player-controls {
+                width: 100%;
+                align-items: center;
+                flex-direction: row;
+                /* Horizontal on mobile line 2 */
+                justify-content: space-between;
+                gap: 10px;
+            }
+
+            .control-buttons {
+                display: flex;
+                /* SHOW controls */
+                gap: 15px;
+            }
+
+            audio {
+                height: 32px;
+                flex: 1;
+                width: auto;
+                max-width: none;
+            }
+
+            .quality-label {
+                display: none;
+            }
+
+            /* Stacked Bottom Nav */
+            .bottom-nav {
+                display: flex;
+                position: relative;
+                width: 100%;
+                height: auto;
+                min-height: var(--nav-height);
+                background: #121212;
+                border-top: 1px solid #333;
+                justify-content: space-around;
+                align-items: center;
+                z-index: 200;
+                flex-shrink: 0;
+                padding-bottom: env(safe-area-inset-bottom);
+                padding-top: 5px;
+            }
+
+            .bottom-nav .nav-item {
+                flex-direction: column;
+                gap: 4px;
+                font-size: 10px;
+                color: #b3b3b3;
+                padding: 10px 0;
+                flex: 1;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .bottom-nav .nav-item.active {
+                color: white;
+            }
+
+            .bottom-nav .nav-item span:first-child {
+                font-size: 20px;
+            }
+        }
+    </style>
+    <style>
+        /* SortableJS Ghost/Fallback Styles */
+        .sortable-ghost {
+            opacity: 0.4;
+            background: #282828;
+        }
+
+        .sortable-fallback {
+            opacity: 1 !important;
+            background: #181818;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+            cursor: grabbing;
         }
     </style>
 </head>
@@ -304,9 +622,10 @@
             <span style="color: var(--primary-color); font-size: 32px;">&#9835;</span> Streamer
         </div>
         <ul class="nav-links">
-            <li class="nav-item active">&#127968; Home</li>
-            <li class="nav-item">&#128269; Search</li>
-            <li class="nav-item">&#128218; Your Library</li>
+            <li class="nav-item active" onclick="switchView('home')" id="nav-home">&#127968; Home</li>
+            <li class="nav-item" onclick="openModal()" id="nav-add">&#10133; Add Song</li>
+            <li class="nav-item" onclick="switchView('library')" id="nav-lib">&#128218; Your Library</li>
+            <li class="nav-item" onclick="logout()" style="margin-top: auto; color: #ff4d4d;">&#128682; Logout</li>
         </ul>
     </aside>
 
@@ -315,20 +634,35 @@
         <div class="header">
             <div class="search-bar">
                 <span style="margin-right: 10px">&#128269;</span>
-                <input type="text" id="songInput" placeholder="Search for songs...">
+                <input type="text" id="filterInput" placeholder="Filter songs..." onkeyup="filterTracks()">
             </div>
-            <button onclick="downloadSong()" id="dlBtn" class="download-btn">Add Song</button>
         </div>
 
         <div id="status"></div>
 
-        <h2>Your Library</h2>
-        <div id="loading" style="color: #888;">Loading your tracks...</div>
+        <h2 id="viewTitle">Public Library</h2>
+        <div id="loading" style="color: #888;">Loading tracks...</div>
 
         <div class="track-list" id="trackList">
             <!-- Tracks injected here -->
         </div>
     </main>
+
+    <!-- Modal for Adding Songs -->
+    <div id="addSongModal" class="modal">
+        <div class="modal-content">
+            <h3>Add to Your Library</h3>
+            <p style="color: #b3b3b3; margin-bottom: 20px; font-size: 0.9rem;">
+                Search for any song on YouTube and we'll download it to your personal Drive folder.
+            </p>
+            <input type="text" id="songInput" class="modal-input" placeholder="e.g. Blinding Lights - The Weeknd">
+
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="downloadSong()" id="dlBtn">Download</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Player Bar -->
     <footer class="player-bar">
@@ -341,16 +675,36 @@
         </div>
 
         <div class="player-controls">
+            <div class="control-buttons">
+                <button class="ctrl-btn" onclick="toggleLoop()" id="btnLoop" title="Loop One">🔁</button>
+                <button class="ctrl-btn" onclick="toggleAutoplay()" id="btnAuto" title="Autoplay">♾️</button>
+            </div>
             <audio id="audioPlayer" controls></audio>
         </div>
 
-        <div style="width: 30%; text-align: right; font-size: 0.8rem; color: #888;">
+        <div class="quality-label">
             Stream Quality: High
         </div>
     </footer>
 
+    <!-- Bottom Nav for Mobile -->
+    <nav class="bottom-nav">
+        <div class="nav-item active" onclick="switchView('home')">
+            <span>&#127968;</span>
+            <span>Home</span>
+        </div>
+        <div class="nav-item" onclick="openModal()">
+            <span>&#10133;</span>
+            <span>Add</span>
+        </div>
+        <div class="nav-item" onclick="switchView('library')">
+            <span>&#128218;</span>
+            <span>Library</span>
+        </div>
+    </nav>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <script>
-        // 🔴 CHANGE THIS TO YOUR RENDER URL (No trailing slash)
         const API_URL = 'https://mystream-sh78.onrender.com';
 
         const trackListEl = document.getElementById('trackList');
@@ -358,64 +712,244 @@
         const currentSongLabel = document.getElementById('currentSong');
         const statusEl = document.getElementById('status');
         const dlBtn = document.getElementById('dlBtn');
+        const viewTitle = document.getElementById('viewTitle');
+        const modal = document.getElementById('addSongModal');
+        const btnLoop = document.getElementById('btnLoop');
+        const btnAuto = document.getElementById('btnAuto');
 
-        // 1. Fetch List
-        async function fetchTracks() {
+        // State
+        let allTracks = [];
+        let currentView = 'home';
+        let currentTrackIndex = -1;
+        let isLooping = false;
+        let isAutoplay = false;
+        let sortableInstance = null;
+
+        // --- AUTH & INIT ---
+        if (!localStorage.getItem('isLoggedIn')) window.location.href = 'login.html';
+
+        // --- INIT SORTABLE ---
+        function initSortable() {
+            if (sortableInstance) sortableInstance.destroy();
+
+            sortableInstance = new Sortable(trackListEl, {
+                animation: 150,
+                delay: 200,
+                delayOnTouchOnly: true,
+                disabled: currentView !== 'library',
+                forceFallback: true, // Fixes mobile drag glitches
+                fallbackOnBody: true, // Fixes "far below" drag offset
+                fallbackClass: 'sortable-fallback',
+                ghostClass: 'sortable-ghost',
+                onEnd: function (evt) {
+                    saveNewOrder();
+                }
+            });
+        }
+
+        // --- NAVIGATION ---
+        function switchView(view) {
+            currentView = view;
+            document.getElementById('loading').style.display = 'block';
+            trackListEl.innerHTML = '';
+
+            document.querySelectorAll('.sidebar .nav-item').forEach(el => el.classList.remove('active'));
+            if (view === 'home') document.getElementById('nav-home').classList.add('active');
+            if (view === 'library') document.getElementById('nav-lib').classList.add('active');
+
+            // Update Sortable State
+            if (sortableInstance) {
+                sortableInstance.option("disabled", view !== 'library');
+            }
+
+            if (view === 'home') {
+                viewTitle.innerText = "Public Library";
+                fetchTracks();
+            } else {
+                viewTitle.innerText = "My Private Collection";
+                fetchTracks(localStorage.getItem('folderId'));
+            }
+        }
+
+        async function fetchTracks(specificFolderId = null) {
             try {
-                const res = await fetch(`${API_URL}/api/tracks`);
-                const tracks = await res.json();
-                document.getElementById('loading').style.display = 'none';
-                trackListEl.innerHTML = '';
+                let url = `${API_URL}/api/tracks`;
+                if (specificFolderId) {
+                    url += `?folderId=${specificFolderId}`;
+                }
 
-                tracks.forEach((track, index) => {
-                    const cleanName = track.name.replace('.mp3', '');
-                    const row = document.createElement('div');
-                    row.className = 'track-row';
-                    row.innerHTML = `
-                        <div class="track-num">${index + 1}</div>
-                        <div class="track-title">${cleanName}</div>
-                        <div style="text-align: right;">${(track.size / 1024 / 1024).toFixed(1)} MB</div>
-                    `;
-                    row.onclick = () => {
-                        // Highlight logic
-                        document.querySelectorAll('.track-row').forEach(r => r.classList.remove('playing'));
-                        row.classList.add('playing');
-                        playTrack(track);
-                    };
-                    trackListEl.appendChild(row);
-                });
+                const res = await fetch(url);
+                if (!res.ok) throw new Error("Failed to load tracks");
+
+                allTracks = await res.json();
+                renderTracks(allTracks);
+
+                document.getElementById('loading').style.display = 'none';
             } catch (err) {
                 document.getElementById('loading').innerText = "Error loading tracks.";
                 console.error(err);
             }
         }
 
-        // 2. Play Track
+        // --- RENDER ---
+        function renderTracks(tracks) {
+            trackListEl.innerHTML = '';
+            if (tracks.length === 0) {
+                trackListEl.innerHTML = '<div style="padding:20px; color:#555;">No songs found here yet.</div>';
+                return;
+            }
+
+            tracks.forEach((track, index) => {
+                const cleanName = track.name.replace('.mp3', '');
+                const row = document.createElement('div');
+                row.className = 'track-row';
+                row.dataset.id = track.id; // CRITICAL for reordering
+
+                // Action Buttons
+                let actionBtn = '';
+                if (currentView === 'home') {
+                    actionBtn = `<button class="action-btn add" onclick="addToLib(event, '${track.id}')" title="Add to Library">&#10133;</button>`;
+                } else {
+                    actionBtn = `<button class="action-btn remove" onclick="removeFromLib(event, '${track.id}')" title="Remove">&#128465;</button>`;
+                }
+
+                row.innerHTML = `
+                    <div class="track-num">${index + 1}</div>
+                    <div class="track-title">${cleanName}</div>
+                    <div style="text-align: right;">${(track.size / 1024 / 1024).toFixed(1)} MB</div>
+                    <div class="track-actions">${actionBtn}</div>
+                `;
+
+                row.onclick = (e) => {
+                    // Ignore clicks on action buttons
+                    if (e.target.closest('.action-btn')) return;
+
+                    currentTrackIndex = index;
+                    document.querySelectorAll('.track-row').forEach(r => r.classList.remove('playing'));
+                    row.classList.add('playing');
+                    playTrack(track);
+                };
+
+                trackListEl.appendChild(row);
+            });
+        }
+
+        // --- LIBRARY ACTIONS ---
+        async function addToLib(e, fileId) {
+            e.stopPropagation();
+
+            // Check for duplicates in current loaded tracks (if we are in home view, we might not know lib contents, 
+            // but we can check if the User blindly clicks add on the same item multiple times in session).
+            // A better check requires backend, but for now:
+            const track = allTracks.find(t => t.id === fileId);
+            if (confirm(`Add "${track ? track.name.replace('.mp3', '') : 'song'}" to your library?`) === false) return;
+
+            try {
+                const res = await fetch(`${API_URL}/api/library/add`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fileId, folderId: localStorage.getItem('folderId') })
+                });
+                if (res.ok) showStatus("✅ Added to library!", 2000);
+            } catch (e) { console.error(e); }
+        }
+
+        async function removeFromLib(e, fileId) {
+            e.stopPropagation();
+            if (!confirm("Delete from your library?")) return;
+
+            try {
+                const res = await fetch(`${API_URL}/api/library/remove`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fileId })
+                });
+                if (res.ok) {
+                    showStatus("🗑️ Deleted!", 2000);
+                    fetchTracks(localStorage.getItem('folderId')); // Refresh
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function saveNewOrder() {
+            // Get all IDs in current order
+            const rows = document.querySelectorAll('.track-row');
+            const newOrder = Array.from(rows).map(row => row.dataset.id).filter(id => id);
+
+            console.log("Saving new order:", newOrder);
+
+            await fetch(`${API_URL}/api/library/reorder`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ folderId: localStorage.getItem('folderId'), newOrder })
+            });
+        }
+
+        // --- PLAYER LOGIC ---
         function playTrack(track) {
             currentSongLabel.innerText = track.name.replace('.mp3', '');
             audioPlayer.src = `${API_URL}/api/stream/${track.id}`;
             audioPlayer.play();
         }
 
-        // 3. Download Logic
+        function toggleLoop() {
+            isLooping = !isLooping;
+            btnLoop.classList.toggle('active');
+            audioPlayer.loop = isLooping;
+        }
+
+        function toggleAutoplay() {
+            isAutoplay = !isAutoplay;
+            btnAuto.classList.toggle('active');
+        }
+
+        audioPlayer.onended = () => {
+            if (isAutoplay && currentTrackIndex < allTracks.length - 1) {
+                const nextTrack = allTracks[currentTrackIndex + 1];
+                currentTrackIndex++;
+                // Highlight next row
+                renderTracks(allTracks);
+                playTrack(nextTrack);
+            }
+        };
+
+
+        // --- MODAL & DOWNLOAD ---
+        function openModal() {
+            modal.style.display = 'flex';
+            document.getElementById('songInput').focus();
+        }
+
+        function closeModal() {
+            modal.style.display = 'none';
+        }
+
+        window.onclick = function (event) {
+            if (event.target == modal) closeModal();
+        }
+
         async function downloadSong() {
             const songName = document.getElementById('songInput').value;
             if (!songName) return;
 
-            showStatus(`🔎 Searching for "${songName}"...`);
+            const folderId = localStorage.getItem('folderId');
+
+            showStatus(`🔎 Searching & Downloading...`);
+            dlBtn.innerHTML = "Downloading...";
             dlBtn.disabled = true;
 
             try {
                 const res = await fetch(`${API_URL}/api/download`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ songName })
+                    body: JSON.stringify({ songName, folderId })
                 });
 
                 if (res.ok) {
-                    showStatus("✅ Downloaded! Refreshing list...", 3000);
+                    showStatus("✅ Added to your library!", 4000);
                     document.getElementById('songInput').value = "";
-                    await fetchTracks();
+                    closeModal();
+                    if (currentView === 'library') fetchTracks(folderId);
                 } else {
                     const err = await res.text();
                     showStatus(`❌ Error: ${err}`, 5000);
@@ -424,18 +958,29 @@
                 showStatus("❌ Network Error", 5000);
             }
             dlBtn.disabled = false;
+            dlBtn.innerHTML = "Download";
         }
 
         function showStatus(msg, duration) {
             statusEl.innerText = msg;
             statusEl.style.display = 'block';
-            if (duration) {
-                setTimeout(() => {
-                    statusEl.style.display = 'none';
-                }, duration);
-            }
+            if (duration) setTimeout(() => statusEl.style.display = 'none', duration);
         }
 
+        function logout() {
+            localStorage.clear();
+            window.location.href = 'login.html';
+        }
+
+        // Client Filter
+        function filterTracks() {
+            const query = document.getElementById('filterInput').value.toLowerCase();
+            const filtered = allTracks.filter(t => t.name.toLowerCase().includes(query));
+            renderTracks(filtered);
+        }
+
+        // Init
+        initSortable(); // Initialize once
         fetchTracks();
     </script>
 </body>
